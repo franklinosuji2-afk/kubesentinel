@@ -1,345 +1,89 @@
 # KubeSentinel
 
-KubeSentinel is a Kubernetes security and GitOps engineering lab designed to demonstrate practical cloud-native security engineering across **Kubernetes validation, container security, policy as code, CI security gates, observability, and runtime security concepts**.
+A local Kubernetes security lab. It checks manifests and container images in CI, and uses OPA Gatekeeper admission policies to reject insecure workloads on a local kind cluster.
 
-The project combines automated validation and security tooling into a repeatable workflow that helps identify configuration, image, and policy issues before workloads reach a Kubernetes environment.
+[![KubeSentinel CI](https://github.com/franklinosuji2-afk/kubesentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/franklinosuji2-afk/kubesentinel/actions/workflows/ci.yml)
 
-Repository: `kubesentinel`
+## What it does
 
----
-
-## Overview
-
-KubeSentinel brings together multiple security and platform engineering controls into a single Kubernetes-focused workflow.
-
-The project demonstrates how security checks can be integrated into the software delivery lifecycle rather than treated as a separate manual step.
-
-Core areas include:
-
-- Kubernetes manifest validation
-- YAML validation
-- Container image security scanning
-- Infrastructure and configuration security checks
-- Policy as code
-- CI security gates
-- Kubernetes security practices
-- Runtime security concepts
-- Metrics and observability
-- Centralized logging
-- GitOps-oriented workflows
-
----
+| Area | What is in the repo |
+|---|---|
+| CI validation | `yamllint` and `kubeconform` on the manifests, plus an import check of the demo app |
+| Image and config scanning | Trivy scans the built image and the repository configuration. HIGH or CRITICAL findings fail the build |
+| Admission policy | Four OPA Gatekeeper constraint templates and constraints: no root containers, no privileged containers, no `latest` image tag, and resource limits required |
+| GitOps | An Argo CD application that syncs the demo app from this repository |
+| Observability | Prometheus (kube-prometheus-stack values) and a Grafana "Security Posture" dashboard |
+| Runtime security | Falco installed through Helm with custom values |
 
 ## Architecture
 
 ```text
-                         Developer
-                             |
-                             v
-                       Git Repository
-                             |
-                             v
-                      GitHub Actions
-                             |
-          +------------------+------------------+
-          |                  |                  |
-          v                  v                  v
-     YAML Validation   Kubernetes Schema    Python Validation
-          |              Validation                |
-          +------------------+------------------+
-                             |
-                             v
-                       Container Build
-                             |
-                  +----------+----------+
-                  |                     |
-                  v                     v
-              Trivy Scan          Conftest Policies
-                  |                     |
-                  +----------+----------+
-                             |
-                             v
-                        Kubernetes
-                             |
-             +---------------+---------------+
-             |               |               |
-             v               v               v
-        Workloads       Security Controls  Monitoring
-                                             |
-                                             v
-                                           Logging
-
-Technology Stack
-Kubernetes and Cloud Native
-Kubernetes
-Docker
-GitOps concepts
-YAML
-Helm
-kind
-Security
-Trivy
-Conftest
-Falco
-Kubernetes security controls
-Policy as code
-Container security scanning
-CI/CD
-GitHub Actions
-Automated validation
-Security gates
-Container build workflows
-Observability
-Prometheus
-Grafana
-Loki
-Development
-Python
-Docker
-kubectl
-Helm
-kind
-Git and GitHub
-Security Engineering Workflow
-
-KubeSentinel implements security checks across several stages of the delivery workflow.
-
-1. YAML Validation
-
-Validates configuration syntax and helps detect malformed YAML before deployment.
-
-2. Kubernetes Manifest Validation
-
-Kubernetes resources are validated against the expected resource schemas before deployment.
-
-3. Python Validation
-
-Python components are checked to ensure the project structure and Python code can be imported successfully.
-
-4. Container Build
-
-Application/container artifacts are built as part of the CI workflow.
-
-5. Container Security Scanning
-
-Trivy is used to identify security issues in container images and configuration.
-
-6. Policy Enforcement
-
-Conftest is used to apply policy-as-code rules to Kubernetes-related configuration.
-
-7. Runtime Security
-
-Falco is included as part of the runtime security architecture for detecting suspicious activity within Kubernetes environments.
-
-Security Controls
-Control	Purpose
-YAML validation	Detect malformed configuration
-Kubernetes schema validation	Validate Kubernetes resources
-Trivy	Scan container images and configuration
-Conftest	Enforce policy as code
-Falco	Runtime security monitoring
-GitHub Actions	Automate validation and security gates
-CI Pipeline
+GitHub Actions (every push and pull request)
+  Validate (yamllint, kubeconform) -> Build image -> Trivy (image + config)
 
-The GitHub Actions pipeline validates the project through multiple stages:
+Local kind cluster (make targets)
+  Argo CD -> syncs demo app from Git
+  Gatekeeper -> rejects root, privileged, latest-tag and no-limits workloads
+  Prometheus + Grafana -> metrics and a security-posture dashboard
+  Falco -> runtime alerts
+```
 
-YAML Validation
-      |
-      v
-Kubernetes Manifest Validation
-      |
-      v
-Python Validation
-      |
-      v
-Docker Image Build
-      |
-      v
-Trivy Security Scanning
-      |
-      v
-Conftest Policy Validation
-
-The CI workflow covers:
-
-YAML syntax validation
-Kubernetes manifest validation
-Python import validation
-Docker image builds
-Container security scanning
-Configuration security scanning
-Policy compliance validation
-
-The objective is to move security and configuration validation earlier in the development lifecycle.
-
-Observability
-
-KubeSentinel includes an observability layer based on:
+## CI pipeline
 
-Prometheus
-Grafana
-Loki
+The workflow is `.github/workflows/ci.yml` and has these jobs:
 
-These components provide a foundation for:
+1. **Lint manifests** runs `yamllint` and `kubeconform` over `apps/`, `manifests/` and `policies/`.
+2. **Test demo app** installs the dependencies and checks that the FastAPI app imports.
+3. **Build image** builds the demo app container.
+4. **Trivy scan** scans the image and the repository configuration for HIGH and CRITICAL findings.
+5. **Validate against Gatekeeper policies** installs `conftest` and checks that the bad example manifests are present. It does not run the policies yet, since enforcement happens in the cluster at admission time.
 
-Metrics collection
-Dashboards
-Operational visibility
-Centralized log analysis
-Security and infrastructure monitoring
+### Security findings the pipeline caught
 
-The observability architecture complements the security controls by providing operational context around Kubernetes workloads and platform behavior.
+The Trivy image scan found three HIGH vulnerabilities in `starlette` 0.38.6, pulled in by `fastapi` 0.115.0 (CVE-2024-47874, CVE-2026-48818 and CVE-2026-54283). They were fixed by upgrading FastAPI and requiring `starlette>=1.3.1`, and the scan now passes.
 
-GitOps and Platform Engineering
+### The `manifests/bad/` folder
 
-The project is structured around Git-based configuration and automated validation concepts commonly used in modern platform engineering environments.
+These manifests are deliberately insecure (root user, privileged container, `latest` tag, no limits). They exist to prove that the Gatekeeper policies reject them, so the CI config scan skips this folder.
 
-A typical workflow is:
+## Try it locally
 
-Configuration Change
-        |
-        v
-Git Commit / Pull Request
-        |
-        v
-Automated Validation
-        |
-        +--> Kubernetes Validation
-        +--> Security Scanning
-        +--> Policy Validation
-        |
-        v
-Approved Configuration
-        |
-        v
-Kubernetes Environment
+You need Docker, `kind`, `kubectl` and `helm`.
 
-This approach demonstrates how Kubernetes security, CI/CD, and platform engineering practices can work together.
+```bash
+make cluster     # create a kind cluster
+make bootstrap   # install Argo CD, Gatekeeper, Prometheus/Grafana and Falco
+make deploy      # build the demo app and deploy it through Argo CD
+make scan        # Trivy scan of the image and manifests
+make violate     # try to apply the insecure manifests; Gatekeeper should reject them
+make destroy     # delete the cluster
+```
 
-Local Development
+## Repository layout
 
-KubeSentinel is designed for local Kubernetes and container-based experimentation.
+```text
+apps/demo-app/            FastAPI demo app, Dockerfile and Kubernetes manifests
+argocd/                   Argo CD application
+cluster/                  kind config and bootstrap script
+manifests/bad/            intentionally insecure example manifests
+policies/gatekeeper/      constraint templates and constraints
+monitoring/               Prometheus values and Grafana dashboard
+security/                 Falco values and Trivy config
+.github/workflows/ci.yml  CI pipeline
+Makefile                  local workflow
+```
 
-Typical tools:
+## Status and limits
 
-docker
-kubectl
-kind
-helm
+- This is a learning and portfolio lab that runs locally on kind. It is not a production setup.
+- The CI pipeline is verified (see the badge). The local cluster workflow is scripted in the Makefile and `cluster/bootstrap.sh`.
+- Not implemented yet: running `conftest` policies in CI, SBOM generation, image signing, and alert rules for the Falco and Gatekeeper metrics.
 
-A local Kubernetes cluster can be created with kind:
+## Author
 
-kind create cluster
+Franklin Osuji, Cloud and DevOps engineer in Berlin.
+[Portfolio](https://cfo-dev.pages.dev/) · [GitHub](https://github.com/franklinosuji2-afk) · [LinkedIn](https://linkedin.com/in/cfo-dev)
 
-Verify the cluster:
+## License
 
-kubectl cluster-info
-
-Verify Kubernetes resources:
-
-kubectl get pods -A
-
-The exact deployment workflow depends on the manifests and components enabled in the repository.
-
-Repository Structure
-
-A typical project layout is:
-
-kubesentinel/
-|
-|-- .github/
-|   `-- workflows/
-|
-|-- kubernetes/
-|
-|-- policies/
-|
-|-- monitoring/
-|
-|-- scripts/
-|
-|-- tests/
-|
-|-- Dockerfile
-|
-`-- README.md
-
-Refer to the repository files for the current implementation and deployment configuration.
-
-Security Principles Demonstrated
-
-KubeSentinel focuses on practical security engineering principles such as:
-
-Shift Left Security
-
-Security and validation checks are integrated into CI before deployment.
-
-Policy as Code
-
-Security and configuration requirements can be represented as automated policies.
-
-Continuous Validation
-
-Kubernetes configuration and application artifacts are validated continuously through automation.
-
-Defense in Depth
-
-The project combines multiple security controls rather than relying on a single scanning mechanism.
-
-Observable Operations
-
-Metrics, dashboards, and logs provide visibility into platform behavior and operational events.
-
-What This Project Demonstrates
-
-KubeSentinel demonstrates practical experience across:
-
-Kubernetes security
-Container security
-GitOps workflows
-CI/CD security gates
-Policy as code
-Kubernetes manifest validation
-Security scanning
-Runtime security concepts
-Observability engineering
-Infrastructure validation
-Linux and container-based environments
-Credentials and Secrets
-
-Credentials are not hard-coded into the repository.
-
-Deployment-specific credentials should be provided through secure configuration mechanisms or Kubernetes secret-management practices appropriate for the target environment.
-
-Never commit passwords, API keys, access tokens, or other sensitive credentials to Git.
-
-Future Enhancements
-
-Potential extensions include:
-
-Expanded Open Policy Agent policies
-Additional Kubernetes security controls
-SBOM generation
-Image signing and verification
-Secret scanning
-Supply-chain security checks
-Runtime alerting
-Advanced Prometheus alert rules
-Automated GitOps deployment
-Kubernetes admission control integration
-Author
-
-Franklin Osuji
-
-Cloud Infrastructure and DevOps Engineer
-
-GitHub:
-https://github.com/franklinosuji2-afk
-
-Portfolio:
-https://fc-dev.netlify.app/
-
-Project Focus
-
-Kubernetes Security | DevSecOps | GitOps | Platform Engineering | Container Security | Policy as Code | Observability
+See [LICENSE](LICENSE).

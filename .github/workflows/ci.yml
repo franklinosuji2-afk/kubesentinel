@@ -48,14 +48,14 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker build -t kubesentinel/demo-app:${{ github.sha }} apps/demo-app
       - name: Trivy image
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: kubesentinel/demo-app:${{ github.sha }}
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
       - name: Trivy config (manifests + policies)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .

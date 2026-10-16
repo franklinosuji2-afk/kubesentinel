@@ -4,7 +4,7 @@ KubeSentinel is a Kubernetes security and GitOps engineering lab designed to dem
 
 The project combines automated validation and security tooling into a repeatable workflow that helps identify configuration, image, and policy issues before workloads reach a Kubernetes environment.
 
-Repository: `sentinel-gate`
+Repository: `kubesentinel`
 
 ---
 
@@ -246,7 +246,7 @@ Repository Structure
 
 A typical project layout is:
 
-sentinel-gate/
+kubesentinel/
 |
 |-- .github/
 |   `-- workflows/

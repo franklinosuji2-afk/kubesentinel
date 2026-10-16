@@ -1,4 +1,4 @@
-.PHONY: cluster bootstrap deploy scan violate monitor destroy help
+.PHONY: cluster bootstrap bootstrap-core deploy scan violate monitor destroy help
 
 CLUSTER_NAME ?= kubesentinel
 IMAGE        ?= kubesentinel/demo-app:0.1.0
@@ -7,6 +7,7 @@ help:
 	@echo "KubeSentinel — make targets"
 	@echo "  cluster    Provision local Kind cluster"
 	@echo "  bootstrap  Install Argo CD, Gatekeeper, Prometheus, Falco"
+	@echo "  bootstrap-core  Install only Argo CD and Gatekeeper (light)"
 	@echo "  deploy     Deploy demo app via Argo CD"
 	@echo "  scan       Trivy scan image + manifests"
 	@echo "  violate    Apply intentionally insecure manifests (expect rejection)"
@@ -20,6 +21,10 @@ cluster:
 bootstrap:
 	bash cluster/bootstrap.sh
 
+# Argo CD + Gatekeeper only (no Prometheus/Grafana/Falco): light enough for a laptop
+bootstrap-core:
+	SKIP_MONITORING=1 bash cluster/bootstrap.sh
+
 deploy:
 	docker build -t $(IMAGE) apps/demo-app
 	kind load docker-image $(IMAGE) --name $(CLUSTER_NAME)
@@ -32,6 +37,7 @@ scan:
 	trivy config --severity HIGH,CRITICAL apps/demo-app/k8s policies manifests
 
 violate:
+	@kubectl create namespace demo --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 	@echo "▶ Attempting to deploy insecure manifests — Gatekeeper should reject all of these:"
 	-kubectl apply -f manifests/bad/root-container.yaml
 	-kubectl apply -f manifests/bad/no-limits.yaml

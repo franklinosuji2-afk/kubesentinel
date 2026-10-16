@@ -25,10 +25,22 @@ sleep 15
 echo "▶ Applying Constraints"
 kubectl apply -f policies/gatekeeper/constraints/
 
+if [ "${SKIP_MONITORING:-0}" = "1" ]; then
+  echo "▶ Skipping kube-prometheus-stack and Falco (SKIP_MONITORING=1)"
+  echo "✅ Core bootstrap complete (Argo CD + Gatekeeper). Run 'make deploy' or 'make violate' next."
+  exit 0
+fi
+
 echo "▶ Installing kube-prometheus-stack"
 kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
 helm upgrade --install kube-prometheus-stack prometheus/kube-prometheus-stack \
   -n monitoring -f monitoring/prometheus/values.yaml --wait
+
+if [ "${SKIP_FALCO:-0}" = "1" ]; then
+  echo "▶ Skipping Falco (SKIP_FALCO=1)"
+  echo "✅ Bootstrap complete without Falco. Run 'make deploy' next."
+  exit 0
+fi
 
 echo "▶ Installing Falco"
 kubectl create namespace falco --dry-run=client -o yaml | kubectl apply -f -

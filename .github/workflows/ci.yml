@@ -10,7 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: yamllint
-        run: pipx install yamllint && yamllint -d "{extends: relaxed, rules: {line-length: disable}}" .
+        run: |
+          pipx install yamllint
+          yamllint -d "{extends: relaxed, rules: {line-length: disable}}" .
       - name: kubeconform
         run: |
           curl -sSLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz

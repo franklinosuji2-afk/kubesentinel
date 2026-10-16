@@ -59,6 +59,8 @@ jobs:
         with:
           scan-type: config
           scan-ref: .
+          # manifests/bad/ holds deliberately insecure examples used to demo the Gatekeeper policies
+          skip-dirs: manifests/bad
           severity: HIGH,CRITICAL
           exit-code: "1"
 

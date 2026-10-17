@@ -77,7 +77,8 @@ Makefile                  local workflow
 
 - This is a learning and portfolio lab that runs locally on kind. It is not a production setup.
 - Verified: the CI pipeline (see the badge) builds the image, lints and validates the manifests, and runs the Trivy scans.
-- Not yet run end to end: the local cluster workflow (`make cluster`, `bootstrap`, `deploy`, `violate`) is scripted in the Makefile and `cluster/bootstrap.sh` but I have not run it on a cluster yet, so expect to adjust Helm versions or values. Results and screenshots will be added here once I have.
+- Verified on a local kind cluster (17 Oct 2026): with Gatekeeper installed and the four constraint templates and constraints applied, `make violate` was rejected for all four insecure manifests (root, privileged, `latest` tag, missing limits). The raw output is in [docs/gatekeeper-rejections.txt](docs/gatekeeper-rejections.txt).
+- Not yet run end to end: that test installed Gatekeeper only. The Argo CD, Prometheus, Grafana and Falco parts of `make bootstrap`, and `make deploy`, are scripted but I have not run them together on a cluster yet, so expect to adjust Helm versions or values.
 - Not implemented yet: running `conftest` policies in CI, SBOM generation, image signing, and alert rules for the Falco and Gatekeeper metrics.
 
 ## Author

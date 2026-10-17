@@ -1,0 +1,24 @@
+KubeSentinel - Gatekeeper admission proof
+Run on: 2026-10-17, local kind cluster "kubesentinel" (kind v0.30.0, node image v1.34.0)
+Installed: OPA Gatekeeper via Helm (Gatekeeper only; Argo CD, Prometheus and Falco were not installed for this run)
+Command: make violate
+
+$ kubectl get constrainttemplates
+NAME                    AGE
+k8sdisallowlatesttag    22s
+k8sdisallowprivileged   22s
+k8sdisallowroot         22s
+k8srequiredresources    21s
+
+$ make violate
+▶ Attempting to deploy insecure manifests — Gatekeeper should reject all of these:
+kubectl apply -f manifests/bad/root-container.yaml
+Error from server (Forbidden): error when creating "manifests/bad/root-container.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [disallow-root] Container app must not run as root (runAsUser=0)
+[disallow-root] Container app must set runAsNonRoot=true
+kubectl apply -f manifests/bad/no-limits.yaml
+Error from server (Forbidden): error when creating "manifests/bad/no-limits.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [require-resources] Container app must declare resources.limits.cpu
+[require-resources] Container app must declare resources.limits.memory
+kubectl apply -f manifests/bad/latest-tag.yaml
+Error from server (Forbidden): error when creating "manifests/bad/latest-tag.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [disallow-latest-tag] Container app uses :latest tag (image=nginx:latest)
+kubectl apply -f manifests/bad/privileged.yaml
+Error from server (Forbidden): error when creating "manifests/bad/privileged.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [disallow-privileged] Container app must not run in privileged mode
